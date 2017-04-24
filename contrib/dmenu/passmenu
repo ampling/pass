@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 ##
-## A consistent pass entry multi selection menu.
+## A dynamic pass entry multi selection menu.
 ##
 ##
 ##
@@ -104,14 +104,14 @@ if [[ -n "$stalelock" ]];then
   stalename=${stalelock%.*}
   report=$(ps -u "$(id -u "$(whoami)")" aux | grep "bash" | grep "passmenu" | grep -v "$$")
   # report=$(ps -u "user id") aux | grep "bash" | grep "passmenu" | grep "not itself id")
-  report2=$(pgrep -f "${0##*/}" > /dev/null)
+  report2=$(pgrep -f "${0##*/}" &>/dev/null)
   echo "report2= $report2"
   stalePID=$(printf %s "$stalename" | 
   sed -e "s/\/tmp\/passmenu\.[0-9]\{1,6\}\?\..*\.//g")
   if [[ $report == *"$stalePID"* ]]; then
     kill "$(ps -o pid= --ppid "$stalePID" )" || exit 1
   else
-    rmdir /tmp/passmenu."$userID".* >/dev/null 2>&1 ||
+    rmdir /tmp/passmenu."$userID".* &>/dev/null ||
     { _notify ":: Unable to clear old filelock"; exit 1; }
   fi
 fi
@@ -130,7 +130,7 @@ if [[ $typeit -eq 0 ]]; then
   if [[ ${#passel[@]} -gt "1" ]]; then
     for entry in "${passel[@]}"; do
       pass show "$entry" | sed '1!d' | tr -d '\n' |
-      xclip -l 1 -quiet -sel "$X_SELECTION" >/dev/null 2>&1
+      xclip -l 1 -quiet -sel "$X_SELECTION" &>/dev/null
       _notify "${passel[$round]} sent via $X_SELECTION"
       round=$((round + 1))
     done
@@ -144,7 +144,7 @@ else
   ## AUTOTYPE
   if [[ ${#passel[@]} -gt "1" ]]; then
     for entry in "${passel[@]}"; do
-      printf '' | xclip -l 1 -quiet -sel "$X_SELECTION" >/dev/null 2>&1
+      printf '' | xclip -l 1 -quiet -sel "$X_SELECTION" &>/dev/null
       pass show "$entry" | sed '1!d' | tr -d '\n' | 
       xdotool type --delay --clearmodifiers --file -
       _notify "${passel[$round]} sent via xdotool"
