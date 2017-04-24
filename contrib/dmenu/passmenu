@@ -3,8 +3,9 @@
 ##
 ## A dynamic pass entry multi selection menu.
 ##
-##
-##
+
+## [2014-2016]  [Jason A. Donenfeld]
+## [2016-2017]  [Ampling]
 
 ## DEPENDENCIES;  pass, dmenu
 ## (optional)	  libnotify, xdotool
