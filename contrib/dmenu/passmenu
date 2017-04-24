@@ -121,7 +121,7 @@ fi
 ( mktemp -d "/tmp/passmenu.$userID.XXXXXXXXXX.$$.lock" &>/dev/null ||
 { _notify "e: Unable to make filelock."; exit 1; } )
 
-## It would be nice to first test if X-selection is null.
+## Avoid setting bash variables to null.
 before=$(xclip -sel "$X_SELECTION" -o | base64) || true
 cleanup=True
 round=0
