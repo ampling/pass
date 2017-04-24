@@ -3,10 +3,9 @@
 ##
 ## A dynamic multi password selection menu.
 ##
-## [Ampling] [2016-2017]
 ##
 
-## DEPENDENCIES;  dmenu, pass
+## DEPENDENCIES;  pass, dmenu
 ## (optional)	  libnotify, xdotool
 
 shopt -s nullglob globstar failglob
@@ -14,6 +13,7 @@ set -euo pipefail
 
 ## SETTINGS
 X_SELECTION=${PASSWORD_STORE_X_SELECTION:-clipboard}
+CLIP_TIME=${PASSWORD_STORE_CLIP_TIME:-45}
 prefix=${PASSWORD_STORE_DIR:-$HOME/.password-store}
 version=passmenu-0.2.8
 
@@ -70,16 +70,15 @@ _finish () {
 
 
 hash xclip &>/dev/null || { _notify "e: xclip not found. Please install xclip."; exit; }
-{ hash xdotool &>/dev/null && clipit=0; } || { _notify "w: xdotool not found."; clipit=0; }
+{ hash xdotool &>/dev/null && typeit=1; } || { _notify "w: xdotool not found."; typeit=0; }
 ## Check for a qupzilla bug which triggers unwanted x-selection events.
 pgrep -fa 'qupzilla' &>/dev/null && _notify "w: conflicts with qupzilla"
 
+
 [[ $arg1 == *v* || $arg2 == *v* ]] && { _notify "$version" && exit; }
 [[ $arg1 == *h* || $arg2 == *h* ]] && { printf '%s\n' "$usage" && exit; }
-[[ $arg1 == *k* || $arg2 == *k* ]] && { _notify "clean and exit."; _clear; exit; }
-[[ $arg1 == *c* || $arg2 == *c* ]] && { clipit=1 && shift; }
-{ [[ $arg1 == *qq* || $arg2 == *qq* ]] && { notifyit=2 && shift; } } ||
-{ [[ $arg1 == *q* || $arg2 == *q* ]] && { notifyit=1 && shift; } }
+[[ $arg1 == '--type' || $arg2 == '--type' ]] && { typeit=1 && shift; }
+[[ $arg1 == '--notify' || $arg2 == '--notify' ]] && { notifyit=1 && shift; }
 [[ ! -e "$prefix" ]] && { _notify "e: $prefix not found." && exit; }
 
 ## Runs the _finish funtion on exit.
@@ -103,26 +102,37 @@ cleanup=True
 round=0
 
 
-if [[ $clipit -eq 0 ]]; then
-  for entry in "${passel[@]}"; do
-    ## AUTOTYPE
-    {
-    printf '' | xclip -l 1 -quiet -sel "$X_SELECTION" &>/dev/null
-    pass show "$entry" | sed '1!d' | tr -d '\n' |
-    xdotool type --delay --clearmodifiers --file -
-    }
-    _notify "${passel[$round]} sent via autotype"
-    round=$((round + 1))
-  done
+if [[ $typeit -eq 0 ]]; then
+  ## CLIPBOARD
+  if [[ ${#passel[@]} -gt "1" ]]; then
+    round=0
+    for entry in "${passel[@]}"; do
+      pass show "$entry" | sed '1!d' | tr -d '\n' |
+      xclip -l 1 -quiet -sel "$X_SELECTION" >/dev/null 2>&1
+      _notify "${passel[$round]} sent via $X_SELECTION"
+      round=$((round + 1))
+    done
+  else
+    pass show "$password" | sed '1!d' | tr -d '\n' |
+    xclip -sel "$X_SELECTION" -i
+    _notify "$password sent via $X_SELECTION"
+    sleep "$CLIP_TIME"
+  fi
 else
-  for entry in "${passel[@]}"; do
-    ## CLIPBOARD
-    {
-    pass show "$entry" | sed '1!d' | tr -d '\n' |
-    xclip -l 1 -quiet -sel "$X_SELECTION" &>/dev/null
-    }
-    _notify "${passel[$round]} sent via $X_SELECTION"
-    round=$((round + 1))
-  done
+  ## AUTOTYPE
+  if [[ ${#passel[@]} -gt "1" ]]; then
+    round=0
+    for entry in "${passel[@]}"; do
+      printf '' | xclip -l 1 -quiet -sel "$X_SELECTION" >/dev/null 2>&1
+      pass show "$entry" | sed '1!d' | tr -d '\n' |
+      xdotool type --delay --clearmodifiers --file -
+      _notify "${passel[$round]} sent via xdotool"
+      round=$((round + 1))
+    done
+  else
+    pass show "$password" | sed '1!d' | tr -d '\n' |
+    xdotool type --delay --clearmodifiers --file -
+    _notify "$password sent via autotype"
+  fi
 fi
 exit
