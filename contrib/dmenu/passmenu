@@ -1,6 +1,15 @@
 #!/usr/bin/env bash
 
+##
+## A consistent pass entry multi selection menu.
+##
+
+##
 ## DEPENDENCIES;  pass, dmenu
+## (optional)     libnotify, xdotool
+##
+
+## DEPENDENCIES;  dmenu, pass
 ## (optional)     libnotify, xdotool
 
 shopt -s nullglob globstar failglob
@@ -10,34 +19,36 @@ set -euo pipefail
 X_SELECTION=${PASSWORD_STORE_X_SELECTION:-clipboard}
 CLIP_TIME=${PASSWORD_STORE_CLIP_TIME:-45}
 prefix=${PASSWORD_STORE_DIR:-$HOME/.password-store}
-version=passmenu-0.1.1
+version=passmenu-0.1.2
 
-arg1=${1:-} 
-arg2=${2:-} 
+arg1=${1:-}
+arg2=${2:-}
 password_files=( $prefix/**/*.gpg )
 password_files=( ${password_files[@]#"$prefix"/} )
 password_files=( ${password_files[@]%.gpg} )
-password=''
-cleanup=''
+selection=''
+cleanup=False
 before=''
+myname=${0##*/}
 userID=$(id -u "$(whoami)")
-usage="${0##*/} [-h help] [-v version] [<dmenu []>]"
+usage="$myname [help] [version] [dmenu...]"
 
 
-## Try to use libnotify.
+## Try libnotify first.
 { hash notify-send 2>/dev/null && notifyit=1; } || 
 { printf '%s\n' "w: libnotify not found" && notifyit=0; }
 
 
 _notify () {
   message=$1
-  [[ "$notifyit" == 1 ]] && 
-  notify-send "$message" --icon=dialog-information || printf '%s\n' "$message"
+  [[ $notifyit == 1 ]] && 
+  notify-send "$message" --icon=dialog-information
+  printf '%s\n' "$message"
 }
 
 
 _finish () {
-  [[ True == "$cleanup" ]] &&
+  [[ $cleanup == True ]] &&
   printf %s "$before" | base64 -d | xclip -sel "$X_SELECTION" -i &&
   if compgen -G "/tmp/passmenu.$userID*" >/dev/null 2>&1 ;then
     rmdir /tmp/passmenu.*.*."$$".lock >/dev/null 2>&1
@@ -58,14 +69,14 @@ _finish () {
 
 ## dmenu exits on KeyPress not KeyRelease.
 ## It might be nice to send KeyRelease event to some dummy window.
-for password in $(printf '%s\n' "${password_files[@]}" | dmenu -f "$@"); do
-  passel+=("$password")
+for selection in $(printf '%s\n' "${password_files[@]}" | dmenu -f "$@"); do
+  passel+=("$selection")
 done
 
 # Runs the _finish funtion on exit. 
 trap _finish EXIT
 
-[[ -n $password ]] || exit
+[[ -n $selection ]] || exit
 
 ## Clearing old filelock(s). 
 umask 077
@@ -95,11 +106,11 @@ fi
 # It would be nice to first test if string exists.
 before=$(xclip -sel "$X_SELECTION" -o 2>/dev/null | base64) || true
 cleanup=True
+round=0
 
 if [[ $typeit -eq 0 ]]; then
   ## CLIPBOARD
   if [[ ${#passel[@]} -gt "1" ]]; then
-    round=0
     for entry in "${passel[@]}"; do
       pass show "$entry" | sed '1!d' | tr -d '\n' |
       xclip -l 1 -quiet -sel "$X_SELECTION" >/dev/null 2>&1
@@ -107,15 +118,14 @@ if [[ $typeit -eq 0 ]]; then
       round=$((round + 1))
     done
   else
-    pass show "$password" | sed '1!d' | tr -d '\n' |
+    pass show "$selection" | sed '1!d' | tr -d '\n' |
     xclip -sel "$X_SELECTION" -i
-    _notify "$password sent via $X_SELECTION"
+    _notify "$selection sent via $X_SELECTION"
     sleep "$CLIP_TIME"
   fi
 else
   ## AUTOTYPE
   if [[ ${#passel[@]} -gt "1" ]]; then
-    round=0
     for entry in "${passel[@]}"; do
       printf '' | xclip -l 1 -quiet -sel "$X_SELECTION" >/dev/null 2>&1
       pass show "$entry" | sed '1!d' | tr -d '\n' | 
@@ -124,9 +134,9 @@ else
       round=$((round + 1))
     done
   else
-    pass show "$password" | sed '1!d' | tr -d '\n' |
+    pass show "$selection" | sed '1!d' | tr -d '\n' |
     xdotool type --delay --clearmodifiers --file -
-    _notify "$password sent via autotype"
+    _notify "selection sent via autotype"
   fi
 fi
 exit
